@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Form
 from pydantic import BaseModel
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from models import create_db_and_tables, SessionDep
+from models.message import Message
+from sqlmodel import select
 
 app = FastAPI()
 
@@ -8,21 +10,22 @@ app = FastAPI()
 class MessageForm(BaseModel):
     content: str
 
-
-class Message(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    content: str
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
+# 
 # Messages CRUD
+# 
 
 @app.get("/message")
-def read_messages():
-    return None
+def read_messages(session: SessionDep):
+    return session.exec(select(Message)).all()
 
 
 @app.get("/message/{message_id}")
@@ -31,8 +34,11 @@ def read_message_by_id(message_id: int):
 
 
 @app.post("/message")
-def create_item():
-    return None
+def create_message(message: Message, session: SessionDep) -> Message:
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+    return message
 
 
 @app.delete("/message/{message_id}")
