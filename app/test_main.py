@@ -50,6 +50,23 @@ def test_get_message_by_id__non_existent():
     assert response.status_code == 404
 
 
+def test_update_message():
+    message = Message(content="Old message")
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+
+    response = client.put(
+        f"/message/{message.id}", 
+        json={"content": "New message"}
+    )
+    
+    session.refresh(message)
+
+    assert response.status_code == 200
+    assert message.content == "New message"
+
+
 def test_delete_message():
     message = Message(content="My message")
     session.add(message)

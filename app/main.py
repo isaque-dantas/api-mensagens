@@ -4,6 +4,7 @@ from starlette.responses import Response
 from app.models import SessionDep
 from app.models.message import Message
 from sqlmodel import select
+from sqlalchemy.sql import text
 
 from app import app
 
@@ -34,6 +35,18 @@ async def create_message(message: Message, session: SessionDep) -> Message:
     session.refresh(message)
 
     return message
+
+
+@app.put("/message/{message_id}")
+async def update_item_by_id(message_id: int, new_message: Message, session: SessionDep):
+    message = session.get(Message, message_id)
+    if not message:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    message.content = new_message.content
+    session.commit()
+    
+    return {"new_content": new_message.content}
 
 
 @app.delete("/message/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
