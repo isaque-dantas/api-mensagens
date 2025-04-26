@@ -1,7 +1,13 @@
 from fastapi.testclient import TestClient
-from main import app
+from sqlmodel import Session
 
-client = TestClient(app)
+from app.main import app
+
+from app.models import engine
+from app.models.message import Message
+
+client = TestClient(app, headers={"content-type": "application/json"})
+session = Session(engine)
 
 
 def test_connection():
@@ -9,8 +15,52 @@ def test_connection():
     assert response.status_code == 200
     assert response.json() == "Hello, World!"
 
-def test_post_message__on_happy_path():
-    response = client.post("/message", content={"content": "Hello"})
-    print(response.json())
+
+def test_post_message():
+    message = {"content": "Hello"}
+
+    response = client.post(
+        "/message",
+        json={"content": "Hello"}
+    )
+
     assert response.status_code == 201
-    assert response.json() == {"id": 1, "content": "Hello"}
+    assert response.json()["content"] == message["content"]
+
+
+def test_get_messages():
+    response = client.get("/message")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_get_message_by_id():
+    session.add(
+        Message(content="My message")
+    )
+    session.commit()
+
+    response = client.get("/message/1")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_get_message_by_id__non_existent():
+    response = client.get("/message/999999999")
+    assert response.status_code == 404
+
+
+def test_delete_message():
+    message = Message(content="My message")
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+
+    response = client.delete(f"/message/{message.id}")
+
+    assert response.status_code == 204
+
+
+def test_delete_message__non_existent():
+    response = client.delete("/message/999999999")
+    assert response.status_code == 404

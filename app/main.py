@@ -1,55 +1,47 @@
-from contextlib import asynccontextmanager
-from typing import Annotated
+from starlette import status
+from starlette.responses import Response
 
-from fastapi import FastAPI, Form
-from pydantic import BaseModel
-from models import create_db_and_tables, SessionDep
-from models.message import Message
+from app.models import SessionDep
+from app.models.message import Message
 from sqlmodel import select
 
-
-@asynccontextmanager
-async def lifespan(app_: FastAPI):
-    create_db_and_tables()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-class MessageForm(BaseModel):
-    content: str
+from app import app
 
 
 @app.get("/")
-def read_root():
+async def read_root():
     return "Hello, World!"
 
 
-#
-# Messages CRUD
-# 
-
 @app.get("/message")
-def read_messages(session: SessionDep):
+async def get_messages(session: SessionDep):
     return session.exec(select(Message)).all()
 
 
 @app.get("/message/{message_id}")
-def read_message_by_id(message_id: int):
-    return None
-
-
-@app.post("/message")
-def create_message(message: Annotated[str, Form()], session: SessionDep) -> Message:
-    # def create_message(message: Annotated[str, Form()], session: SessionDep) -> Message:
-    # session.add(message)
-    # session.commit()
-    # session.refresh(message)
+async def get_message_by_id(message_id: int, session: SessionDep):
+    message = session.get(Message, message_id)
+    if not message:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     return message
 
 
-@app.delete("/message/{message_id}")
-def delete_item_by_id(message_id: int):
+@app.post("/message", status_code=status.HTTP_201_CREATED)
+async def create_message(message: Message, session: SessionDep) -> Message:
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+
+    return message
+
+
+@app.delete("/message/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_item_by_id(message_id: int, session: SessionDep):
+    message = session.get(Message, message_id)
+    if not message:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    session.delete(message)
+
     return None
